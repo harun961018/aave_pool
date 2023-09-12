@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.0 <0.9.0;
 
-import "./interfaces/IMasterChefv3.sol";
 import "./interfaces/IFeeTierStrate.sol";
 
 import "./utils/Ownable.sol";
 
-contract LCPoolPCv3Ledger is Ownable {
+contract LCPoolAVv3Ledger is Ownable {
 
   address public feeStrate;
 
@@ -171,7 +170,7 @@ contract LCPoolPCv3Ledger is Ownable {
       jvar[1] += jvar[3];
 
       if (poolInfoAll[pId][tn-1].tvl > 0 && currentReward >= poolInfoAll[pId][tn-1].prevReward) {
-        jvar[1] = jvar[1] + (jvar[2] + jvar[0]) * (currentReward - poolInfoAll[pId][tn-1].prevReward) / poolInfoAll[tId][tn-1].tvl;
+        jvar[1] = jvar[1] + (jvar[2] + jvar[0]) * (currentReward - poolInfoAll[pId][tn-1].prevReward) / poolInfoAll[pId][tn-1].tvl;
       }
     }
 

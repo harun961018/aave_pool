@@ -4,15 +4,14 @@ pragma solidity >=0.8.0 <0.9.0;
 import "./interfaces/IWETH.sol";
 import "./interfaces/ISwapPlusv1.sol";
 import "./interfaces/IFeeTierStrate.sol";
-import "./interfaces/ILCPoolPCv3Ledger.sol";//should be changed
+import "./interfaces/ILCPoolAVv3Ledger.sol";//should be changed
 import "./interfaces/IPool.sol";
-
+import {DataTypes} from './utils/DataTypes.sol';
 import "./utils/Ownable.sol";
 import "./utils/SafeERC20.sol";
  
 contract LCPoolAVv3 is Ownable {
   using SafeERC20 for IERC20;
-
   address public WETH;
   address public swapRouter;
   address public feeStrate;
@@ -55,9 +54,9 @@ contract LCPoolAVv3 is Ownable {
     address _feeStrate,
     address _ledger,
     address _WETH,
-    address _aavePool;
+    address _aavePool
   ) {
-    require(_aavePool != address(0), "LC pool: master chef");
+    require(_aavePool != address(0), "LC pool: aave pool");
     require(_swapRouter != address(0), "LC pool: swap router");
     require(_feeStrate != address(0), "LC pool: feeStrate");
     require(_ledger != address(0), "LC pool: ledger");
@@ -83,8 +82,8 @@ contract LCPoolAVv3 is Ownable {
   
   function deposit(
     Operator calldata info,
-    address calldata mtoken,
-    swapPath[2] calldata paths,
+    address mtoken,
+    swapPath[2] calldata paths
   ) public payable returns(uint256, uint256) {
     require(msg.sender == info.account || operators[msg.sender], "LC pool: no access");
     uint256[] memory dpvar = new uint256[](4);
@@ -106,18 +105,18 @@ contract LCPoolAVv3 is Ownable {
     (dpvar[1], dpvar[0], dpvar[2], ,) = _reinvest(info, false);
 
     dpvar[3] = _distributeFee(info.basketId, (info.token==address(0)?WETH:info.token), dpvar[3], 1);
-    (uint16 tokenId, uint256 liquidity) = _deposit(info, dpvar[3], mtoken, paths);
-    ILCPoolPCv3Ledger(ledger).updateInfo(info.account, tokenId, info.basketId, liquidity, dpvar[0], dpvar[2], dpvar[1], true);
+    (uint16 poolId, uint256 liquidity) = _deposit(info, dpvar[3], mtoken, paths);
+    ILCPoolAVv3Ledger(ledger).updateInfo(info.account, poolId, info.basketId, liquidity, dpvar[0], dpvar[2], dpvar[1], true);
 
-    return (tokenId, liquidity);
+    return (poolId, liquidity);
   }
 
   function withdraw(
     address receiver,
     Operator calldata info,
-    address[2][2] calldata mtoken,
-    swapPath[3] calldata paths,
-    swapPath[3] calldata rpaths,
+    address mtoken,
+    swapPath[2] calldata paths,
+    swapPath[2] calldata rpaths
   ) public returns(uint256) {
     require(receiver == info.account || operators[msg.sender], "LC pool: no access");
     // 0: reward
@@ -132,7 +131,7 @@ contract LCPoolAVv3 is Ownable {
     uint256[] memory wvar = new uint256[](9);
     
     // return extraLp, reward, reserved reward, claim extra lp, claim reward amount
-    (wvar[1], wvar[0], wvar[2], wvar[5], wvar[6]) = _reinvest(info, mtoken[1], paths, true);
+    (wvar[1], wvar[0], wvar[2], wvar[5], wvar[6]) = _reinvest(info, true);
     wvar[8] = IERC20(info.pair[0]).balanceOf(address(this));
     if (wvar[8] < wvar[6]) {
       wvar[6] = wvar[8];
@@ -146,8 +145,8 @@ contract LCPoolAVv3 is Ownable {
       isCoin = true;
     }
     // return tokenId, withdraw liquidity amount, receive token amount
-    (wvar[3], wvar[7], wvar[4]) = _withdraw(info, wvar[5], mtoken[0], paths);
-    ILCPoolPCv3Ledger(ledger).updateInfo(info.account, wvar[3], info.basketId, wvar[7], wvar[0], wvar[2], wvar[1], false);
+    (wvar[3], wvar[7], wvar[4]) = _withdraw(info, wvar[5], mtoken, paths);
+    ILCPoolAVv3Ledger(ledger).updateInfo(info.account, uint16(wvar[3]), info.basketId, wvar[7], wvar[0], wvar[2], wvar[1], false);
 
     wvar[4] = _distributeFee(info.basketId, isCoin?WETH:info.token, wvar[4], 0);
 
@@ -178,23 +177,25 @@ contract LCPoolAVv3 is Ownable {
     address tokenIn,
     uint256 amountIn,
     address[2] memory tokens,
-    address calldata mToken,
-    swapPath[3] calldata paths
-  ) internal returns(uint256, uint256) {
-    uint256 memory out;
+    address mToken,
+    swapPath[2] calldata paths
+  ) internal returns(uint256) {
+    uint256 outs;
     outs = amountIn;
     uint256 amountM = amountIn;
     if (tokenIn == address(0)) tokenIn = WETH;
-
+    if (tokenIn == tokens[0]) {
+      return outs;
+    }
     if (paths[0].path.length > 0) {
       _approveTokenIfNeeded(tokenIn, swapRouter, amountM);
-      (, amountM) = ISwapPlusv1(swapRouter).swap(tokenIn, amountM, mTokens[0], address(this), paths[0].path);
+      (, amountM) = ISwapPlusv1(swapRouter).swap(tokenIn, amountM, mToken, address(this), paths[0].path);
     }
     if (paths[1].path.length > 0) {
-      _approveTokenIfNeeded(mTokens[0], swapRouter, amountM);
-      (, amountM) = ISwapPlusv1(swapRouter).swap(mTokens[0], amountM, tokens[0], address(this), paths[1].path);
+      _approveTokenIfNeeded(mToken, swapRouter, amountM);
+      (, amountM) = ISwapPlusv1(swapRouter).swap(mToken, amountM, tokens[0], address(this), paths[1].path);
     }
-    outs = amountM
+    outs = amountM;
     return outs;
   }
 
@@ -206,7 +207,7 @@ contract LCPoolAVv3 is Ownable {
     bool claimReward
   ) internal returns(uint256, uint256, uint256, uint256, uint256) {
     uint256[] memory rvar = new uint256[](6);
-    uint16 memory poolId = ILCPoolAVv3Ledger(ledger).poolToId(info.pair[0], info.pair[1], uint24(info.meta));
+    uint16 poolId = ILCPoolAVv3Ledger(ledger).poolToId(info.pair[0], info.pair[1], uint24(info.meta));
     rvar[0] = 0;
     rvar[1] = 0; // extraLp
     rvar[3] = 0; // claim extra lp
@@ -214,12 +215,12 @@ contract LCPoolAVv3 is Ownable {
     if (poolId != 0) {
       rvar[5] = IERC20(info.pair[1]).balanceOf(address(this));
       rvar[5] -= ILCPoolAVv3Ledger(ledger).getTVLAmount(poolId);//
-      rvar[0] = IPool.withdraw(info.pair[0], rvar[5]);
+      rvar[0] = IPool(aavePool).withdraw(info.pair[0], rvar[5], address(this));
     }
     if (claimReward && poolId != 0) {
-      (rvar[3], rvar[4]) = ILCPoolPCv3Ledger(ledger).getSingleReward(info.account, poolId, info.basketId, rvar[0], false);
+      (rvar[3], rvar[4]) = ILCPoolAVv3Ledger(ledger).getSingleReward(info.account, poolId, info.basketId, rvar[0], false);
     }// should be checked
-    rvar[0] += ILCPoolPCv3Ledger(ledger).getLastRewardAmount(rvar[0]);
+    rvar[0] += ILCPoolAVv3Ledger(ledger).getLastRewardAmount(poolId);
 
     rvar[0] = _distributeFee(info.basketId, info.pair[0], rvar[0], 2);
     rvar[0] = rvar[0] >= rvar[4] ? rvar[0] - rvar[4] : 0;
@@ -240,69 +241,37 @@ contract LCPoolAVv3 is Ownable {
   function _deposit(
     Operator calldata info,
     uint256 iAmount,
-    address calldata mtoken,
-    swapPath[2] calldata paths,
-  ) internal returns(uint256, uint256) {
-    uint256 amount0 = _depositSwap(info.token, iAmount, info.pair, mtoken, paths);
-    uint256 tokenId = ILCPoolPCv3Ledger(ledger).poolToNftId(info.pair[0], info.pair[1], uint24(info.meta)); // tokenId
-    if (tokenId == 0) {
-      (,,,,,,,tokenId,,,,,,,) = IPool(aavePool).getReserveData(info.pair[0]);
-      tokenId += 1;
-      ILCPoolPCv3Ledger(ledger).setPoolToNftId(info.pair[0], info.pair[1], info.meta, tokenId); 
+    address mtoken,
+    swapPath[2] calldata paths
+  ) internal returns(uint16, uint256) {
+    uint256 amountToSupply = _depositSwap(info.token, iAmount, info.pair, mtoken, paths);
+    uint16 poolId = ILCPoolAVv3Ledger(ledger).poolToId(info.pair[0], info.pair[1], uint24(info.meta)); // poolId
+    if (poolId == 0) {
+
+      DataTypes.ReserveData memory reserveData = IPool(aavePool).getReserveData(info.pair[0]);
+      poolId = reserveData.id;
+      poolId += 1;
+      ILCPoolAVv3Ledger(ledger).setPoolToId(info.pair[0], info.pair[1], uint24(info.meta), poolId); 
     }
-    _increaseLiquidity(info.pair[0], amount0);
+    amountToSupply = _increaseLiquidity(info.pair, amountToSupply);
     // _refundReserveToken(info.account, info.pair[0], info.pair[1], amount0-amount[0], amount1-amount[1]);
-    emit Deposit(tokenId, amount0);
-    return (tokenId, amount0);
-  }
-
-  function _mintNewPosition(
-    address token0,
-    address token1,
-    uint24 fee,
-    uint256 amount0ToAdd,
-    uint256 amount1ToAdd,
-    uint256 amount0Min,
-    uint256 amount1Min
-  ) internal returns (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1) {
-    _approveTokenIfNeeded(token0, nftManager, amount0ToAdd);
-    _approveTokenIfNeeded(token1, nftManager, amount1ToAdd);
-
-    int24 tickSpacing = IPancakeV3Factory(nftFactory).feeAmountTickSpacing(fee);
-
-    INonfungiblePositionManager.MintParams
-      memory params = INonfungiblePositionManager.MintParams({
-        token0: token0,
-        token1: token1,
-        fee: fee,
-        tickLower: (MIN_TICK / tickSpacing) * tickSpacing,
-        tickUpper: (MAX_TICK / tickSpacing) * tickSpacing,
-        amount0Desired: amount0ToAdd,
-        amount1Desired: amount1ToAdd,
-        amount0Min: amount0Min,
-        amount1Min: amount1Min,
-        recipient: address(this),
-        deadline: block.timestamp
-      });
-
-    (tokenId, liquidity, amount0, amount1) = INonfungiblePositionManager(nftManager).mint(params);
-    INonfungiblePositionManager(nftManager).safeTransferFrom(address(this), v3MasterChef, tokenId);
-    ILCPoolPCv3Ledger(ledger).setPoolToNftId(token0, token1, fee, tokenId);
+    emit Deposit(poolId, amountToSupply);
+    return (poolId, amountToSupply);
   }
 
   function _increaseLiquidity(
     address[2] memory token,
-    uint256 amountToAdd,
+    uint256 amountToAdd
   ) internal returns(uint256){
     uint256 addedaTokenAmount = IERC20(token[1]).balanceOf(address(this));
-    _approveTokenIfNeeded(token[0], aavePool, amount0ToAdd);
+    _approveTokenIfNeeded(token[0], aavePool, amountToAdd);
     IPool(aavePool).supply(token[0], amountToAdd, address(this), 0);
     if (IERC20(token[1]).balanceOf(address(this)) > addedaTokenAmount) {
       addedaTokenAmount = IERC20(token[1]).balanceOf(address(this)) - addedaTokenAmount;
     } else {
       addedaTokenAmount = 0;
     }
-    returns addedaTokenAmount;
+    return addedaTokenAmount;
   }
 
   function _refundReserveToken(address account, address token0, address token1, uint256 amount0, uint256 amount1) internal {
@@ -317,22 +286,26 @@ contract LCPoolAVv3 is Ownable {
   function _withdrawSwap(
     address tokenOut,
     address[2] memory tokens,
-    uint256 memory amount,
-    address[2] memory mTokens,
+    uint256 amount,
+    address mToken,
     swapPath[2] memory paths
   ) internal returns(uint256) {
-    uint256 amountM = amount[0];
+    uint256 outs;
+    uint256 amountM = amount;
+    outs = amount;
+
     if (paths[1].path.length > 0) {
-      _approveTokenIfNeeded(tokens[1], swapRouter, amount);
-      (, amountM) = ISwapPlusv1(swapRouter).swap(tokens[1], amount, mTokens[1], address(this), paths[1].path);
+      _approveTokenIfNeeded(tokens[0], swapRouter, amount);
+      (, amountM) = ISwapPlusv1(swapRouter).swap(tokens[0], amount, mToken, address(this), paths[1].path);
     }
 
     if (paths[0].path.length > 0) {
-      _approveTokenIfNeeded(mTokens[1], swapRouter, amountM);
-      (, amountM) = ISwapPlusv1(swapRouter).swap(mTokens[1], amountM, tokenOut, address(this), paths[0].path);
+      _approveTokenIfNeeded(mToken, swapRouter, amountM);
+      (, amountM) = ISwapPlusv1(swapRouter).swap(mToken, amountM, tokenOut, address(this), paths[0].path);
       return amountM;
     }
   }
+  
 
   /**
    * return tokenId, withdraw liquidity amount, receive token amount
@@ -340,20 +313,20 @@ contract LCPoolAVv3 is Ownable {
   function _withdraw(
     Operator calldata info,
     uint256 extraLp,
-    address[2] memory mtoken,
-    swapPath[3] memory paths,
+    address mtoken,
+    swapPath[2] memory paths
   ) internal returns(uint256, uint256, uint256) {
-    uint256 tokenId = ILCPoolPCv3Ledger(ledger).poolToNftId(info.pair[0], info.pair[1], uint24(info.meta));
-    if (tokenId == 0) {
+    uint16 poolId = ILCPoolAVv3Ledger(ledger).poolToId(info.pair[0], info.pair[1], uint24(info.meta));
+    if (poolId == 0) {
       return (0, 0, 0);
     }
     else {
       uint256 withdrawAmount = info.amount;
-      uint256 userLiquidity = ILCPoolPCv3Ledger(ledger).getUserLiquidity(info.account, tokenId, info.basketId);
+      uint256 userLiquidity = ILCPoolAVv3Ledger(ledger).getUserLiquidity(info.account, poolId, info.basketId);
       if (userLiquidity < withdrawAmount) {
         withdrawAmount = userLiquidity;
       }
-      uint256[] memory amount = new uint256[](3);
+      uint256[] memory amount = new uint256[](2);
       withdrawAmount += extraLp;
       uint256 liquidity = IERC20(info.pair[1]).balanceOf(address(this));
       if (liquidity < withdrawAmount) {
@@ -361,22 +334,22 @@ contract LCPoolAVv3 is Ownable {
       }
       if (withdrawAmount > 0) {
         amount[0] = _decreaseLiquidity(info.pair[0], withdrawAmount);
-        amount[2] = _withdrawSwap(info.token, info.pair, amount, mtoken, paths);
-        emit Withdraw(tokenId, withdrawAmount, amount[2]);
-        return (tokenId, withdrawAmount, amount[2]);
+        amount[2] = _withdrawSwap(info.token, info.pair, amount[0], mtoken, paths);
+        emit Withdraw(poolId, withdrawAmount, amount[2]);
+        return (poolId, withdrawAmount, amount[2]);
       }
       else {
-        return (tokenId, withdrawAmount, 0);
+        return (poolId, withdrawAmount, 0);
       }
     }
   }
 
   function _decreaseLiquidity(
-    address token
-    uint256 liquidity,
+    address token,
+    uint256 liquidity
   ) internal returns (uint256) {
     uint256 amount;
-    amount = IPool.withdraw(token, liquidity);
+    amount = IPool(aavePool).withdraw(token, liquidity, address(this));
     return amount;
   }
 
