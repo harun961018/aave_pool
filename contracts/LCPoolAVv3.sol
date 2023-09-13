@@ -262,7 +262,7 @@ contract LCPoolAVv3 is Ownable {
     address[2] memory token,
     uint256 amountToAdd
   ) internal returns(uint256){
-    uint256 addedaTokenAmount = IERC20(token[1]).balanceOf(address(this));
+    uint256 addedaTokenAmount = IERC20(token[0]).balanceOf(address(this));
     _approveTokenIfNeeded(token[0], aavePool, amountToAdd);
     IPool(aavePool).supply(token[0], amountToAdd, address(this), 0);
     if (IERC20(token[1]).balanceOf(address(this)) > addedaTokenAmount) {
