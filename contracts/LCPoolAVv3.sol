@@ -41,12 +41,11 @@ contract LCPoolAVv3 is Ownable {
     _;
   }
 
-  event Deposit(uint256 nftId, uint256 liquiidty);
-  event Withdraw(uint256 nftId, uint256 liquiidty, uint256 amountOut);
-  event ReInvest(address token0, address token1, uint24 fee, uint256 nftId, uint256 reward, uint256 extraLp);
-  event RemovePool(address operator, address from, uint256 tokenId, address token0, address token1, uint24 fee, bytes data);
+  event Deposit(uint16 poolId, uint256 liquiidty);
+  event Withdraw(uint16 poolId, uint256 liquiidty, uint256 amountOut);
+  event ReInvest(address token0, address token1, uint24 fee, uint16 poolId, uint256 reward, uint256 extraLp);
   event LcFee(address account, address token, uint256 amount);
-  event ClaimReward(address account, uint256 nftId, uint256 basketId, uint256 extraLp, uint256 reward);
+  event ClaimReward(address account, uint16 poolId, uint256 basketId, uint256 extraLp, uint256 reward);
 
   constructor (
 
@@ -161,7 +160,7 @@ contract LCPoolAVv3 is Ownable {
       }
     }
     if (wvar[5] > 0 || wvar[6] > 0) {
-      emit ClaimReward(info.account, wvar[3], info.basketId, wvar[5], wvar[6]);
+      emit ClaimReward(info.account, uint16(wvar[3]), info.basketId, wvar[5], wvar[6]);
     }
     return wvar[4];
   }
@@ -208,19 +207,19 @@ contract LCPoolAVv3 is Ownable {
   ) internal returns(uint256, uint256, uint256, uint256, uint256) {
     uint256[] memory rvar = new uint256[](6);
     uint16 poolId = ILCPoolAVv3Ledger(ledger).poolToId(info.pair[0], info.pair[1], uint24(info.meta));
-    rvar[0] = 0;
+    rvar[0] = 0; //reward
     rvar[1] = 0; // extraLp
     rvar[3] = 0; // claim extra lp
     rvar[4] = 0; // claim reward amount
     if (poolId != 0) {
       rvar[5] = IERC20(info.pair[1]).balanceOf(address(this));
-      rvar[5] -= ILCPoolAVv3Ledger(ledger).getTVLAmount(poolId);//
+      rvar[5] -= ILCPoolAVv3Ledger(ledger).getTVLAmount(poolId);
       rvar[0] = IPool(aavePool).withdraw(info.pair[0], rvar[5], address(this));
     }
     if (claimReward && poolId != 0) {
       (rvar[3], rvar[4]) = ILCPoolAVv3Ledger(ledger).getSingleReward(info.account, poolId, info.basketId, rvar[0], false);
     }// should be checked
-    rvar[0] += ILCPoolAVv3Ledger(ledger).getLastRewardAmount(poolId);
+    rvar[0] += ILCPoolAVv3Ledger(ledger).getLastRewardAmount(poolId);//Need to check
 
     rvar[0] = _distributeFee(info.basketId, info.pair[0], rvar[0], 2);
     rvar[0] = rvar[0] >= rvar[4] ? rvar[0] - rvar[4] : 0;
@@ -230,7 +229,7 @@ contract LCPoolAVv3 is Ownable {
       rvar[2] = IERC20(info.pair[0]).balanceOf(address(this));
       rvar[1] = _increaseLiquidity(info.pair, rvar[0]);
       rvar[2] = rvar[0] + IERC20(info.pair[0]).balanceOf(address(this)) - rvar[2];
-      emit ReInvest(info.pair[0], info.pair[1], uint24(info.meta), rvar[0], rvar[0], rvar[1]);
+      emit ReInvest(info.pair[0], info.pair[1], uint24(info.meta), poolId, rvar[0], rvar[1]);
     }// should be checked
     return (rvar[1], rvar[0], rvar[2], rvar[3], rvar[4]);
   }
@@ -405,6 +404,11 @@ contract LCPoolAVv3 is Ownable {
   function setSwapRouter(address _swapRouter) external onlyManager {
     require(_swapRouter != address(0), "LC pool: Swap Router");
     swapRouter = _swapRouter;
+  }
+
+  function setAavePool(address _aavePool) external onlyManager {
+    require(_aavePool != address(0), "LC pool: Swap Router");
+    aavePool = _aavePool;
   }
 
   function setReinvestInfo(bool able, uint256 edge) public onlyManager {
