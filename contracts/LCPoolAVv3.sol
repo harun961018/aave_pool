@@ -205,7 +205,7 @@ contract LCPoolAVv3 is Ownable {
     Operator calldata info,
     bool claimReward
   ) internal returns(uint256, uint256, uint256, uint256, uint256) {
-    uint256[] memory rvar = new uint256[](6);
+    uint256[] memory rvar = new uint256[](7);
     uint16 poolId = ILCPoolAVv3Ledger(ledger).poolToId(info.pair[0], info.pair[1], uint24(info.meta));
     rvar[0] = 0; //reward
     rvar[1] = 0; // extraLp
@@ -213,22 +213,23 @@ contract LCPoolAVv3 is Ownable {
     rvar[4] = 0; // claim reward amount
     if (poolId != 0) {
       rvar[5] = IERC20(info.pair[1]).balanceOf(address(this));
-      rvar[5] -= ILCPoolAVv3Ledger(ledger).getTVLAmount(poolId);
-      rvar[0] = IPool(aavePool).withdraw(info.pair[0], rvar[5], address(this));
+      rvar[6] = ILCPoolAVv3Ledger(ledger).getTVLAmount(poolId);
+      if (rvar[5] > rvar[6]) {
+        rvar[5] = rvar[5] - rvar[6];
+        rvar[0] =_decreaseLiquidity(info.pair[0], rvar[5]);
+      }
     }
     if (claimReward && poolId != 0) {
       (rvar[3], rvar[4]) = ILCPoolAVv3Ledger(ledger).getSingleReward(info.account, poolId, info.basketId, rvar[0], false);
-    }// should be checked
-    rvar[0] += ILCPoolAVv3Ledger(ledger).getLastRewardAmount(poolId);//Need to check
-
+    }
+    rvar[0] += ILCPoolAVv3Ledger(ledger).getLastRewardAmount(poolId);
     rvar[0] = _distributeFee(info.basketId, info.pair[0], rvar[0], 2);
     rvar[0] = rvar[0] >= rvar[4] ? rvar[0] - rvar[4] : 0;
     rvar[2] = rvar[0]; // reserveReward need to check
 
     if (reinvestAble && poolId != 0 && rvar[0] >= reinvestEdge) {
-      rvar[2] = IERC20(info.pair[0]).balanceOf(address(this));
       rvar[1] = _increaseLiquidity(info.pair, rvar[0]);
-      rvar[2] = rvar[0] + IERC20(info.pair[0]).balanceOf(address(this)) - rvar[2];
+      rvar[2] = rvar[0] - rvar[1];
       emit ReInvest(info.pair[0], info.pair[1], uint24(info.meta), poolId, rvar[0], rvar[1]);
     }// should be checked
     return (rvar[1], rvar[0], rvar[2], rvar[3], rvar[4]);
@@ -263,13 +264,16 @@ contract LCPoolAVv3 is Ownable {
     uint256 amountToAdd
   ) internal returns(uint256){
     uint256 addedaTokenAmount = IERC20(token[0]).balanceOf(address(this));
-    _approveTokenIfNeeded(token[0], aavePool, amountToAdd);
-    IPool(aavePool).supply(token[0], amountToAdd, address(this), 0);
-    if (IERC20(token[1]).balanceOf(address(this)) > addedaTokenAmount) {
-      addedaTokenAmount = IERC20(token[1]).balanceOf(address(this)) - addedaTokenAmount;
+    if (addedaTokenAmount > amountToAdd) {
+      _approveTokenIfNeeded(token[0], aavePool, amountToAdd);
+      IPool(aavePool).supply(token[0], amountToAdd, address(this), 0);
     } else {
-      addedaTokenAmount = 0;
+      _approveTokenIfNeeded(token[0], aavePool, addedaTokenAmount);
+      IPool(aavePool).supply(token[0], addedaTokenAmount, address(this), 0);
     }
+
+    addedaTokenAmount -= IERC20(token[0]).balanceOf(address(this));
+
     return addedaTokenAmount;
   }
 
@@ -333,9 +337,9 @@ contract LCPoolAVv3 is Ownable {
       }
       if (withdrawAmount > 0) {
         amount[0] = _decreaseLiquidity(info.pair[0], withdrawAmount);
-        amount[2] = _withdrawSwap(info.token, info.pair, amount[0], mtoken, paths);
-        emit Withdraw(poolId, withdrawAmount, amount[2]);
-        return (poolId, withdrawAmount, amount[2]);
+        amount[1] = _withdrawSwap(info.token, info.pair, amount[0], mtoken, paths);
+        emit Withdraw(poolId, withdrawAmount, amount[1]);
+        return (poolId, withdrawAmount, amount[1]);
       }
       else {
         return (poolId, withdrawAmount, 0);
