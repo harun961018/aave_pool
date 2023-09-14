@@ -71,13 +71,6 @@ contract LCPoolAVv3 is Ownable {
 
   receive() external payable {
   }
-
-  /**
-   * mtoken     0: tokenMReward, 1: tM'
-   * percent    0: tM->t0%       1: tM->t1%
-   * paths      0: tIn->tM,      1: tM->t0,  2: tM->t1
-   * minAmounts 0: lpMin0        1: lpMin1
-   */
   
   function deposit(
     Operator calldata info,
@@ -114,19 +107,9 @@ contract LCPoolAVv3 is Ownable {
     address receiver,
     Operator calldata info,
     address mtoken,
-    swapPath[2] calldata paths,
-    swapPath[2] calldata rpaths
+    swapPath[2] calldata paths
   ) public returns(uint256) {
     require(receiver == info.account || operators[msg.sender], "LC pool: no access");
-    // 0: reward
-    // 1: exLp
-    // 2: rewardReserve
-    // 3: tokenId
-    // 4: outAmount
-    // 5: claim extra lp
-    // 6: claim reward amount
-    // 7: withdrawn liquidity amount
-    // 8: current reward
     uint256[] memory wvar = new uint256[](9);
     
     // return extraLp, reward, reserved reward, claim extra lp, claim reward amount
@@ -165,13 +148,6 @@ contract LCPoolAVv3 is Ownable {
     return wvar[4];
   }
 
-  /**
-   * tokens   0: token0,  1: token1,
-   * mtokens  0: tokenM,  1: tM'
-   * paths    0: t->tM,   1: tM->t0,   2: tM->t1
-   * percents 0: tM->t0%  1: tM->t1%
-   * return amount0, amount1
-   */
   function _depositSwap(
     address tokenIn,
     uint256 amountIn,
@@ -182,7 +158,6 @@ contract LCPoolAVv3 is Ownable {
     uint256 outs;
     outs = amountIn;
     uint256 amountM = amountIn;
-    if (tokenIn == address(0)) tokenIn = WETH;
     if (tokenIn == tokens[0]) {
       return outs;
     }
@@ -198,9 +173,6 @@ contract LCPoolAVv3 is Ownable {
     return outs;
   }
 
-  /**
-   * return extraLp, reward, reserved reward, claim extra lp, claim reward amount
-   */
   function _reinvest(
     Operator calldata info,
     bool claimReward
@@ -235,9 +207,6 @@ contract LCPoolAVv3 is Ownable {
     return (rvar[1], rvar[0], rvar[2], rvar[3], rvar[4]);
   }
 
-  /**
-   * return tokenId, liquidity
-   */
   function _deposit(
     Operator calldata info,
     uint256 iAmount,
@@ -296,7 +265,9 @@ contract LCPoolAVv3 is Ownable {
     uint256 outs;
     uint256 amountM = amount;
     outs = amount;
-
+    if (tokenOut == tokens[0]) {
+      return outs;
+    }
     if (paths[1].path.length > 0) {
       _approveTokenIfNeeded(tokens[0], swapRouter, amount);
       (, amountM) = ISwapPlusv1(swapRouter).swap(tokens[0], amount, mToken, address(this), paths[1].path);
@@ -305,14 +276,12 @@ contract LCPoolAVv3 is Ownable {
     if (paths[0].path.length > 0) {
       _approveTokenIfNeeded(mToken, swapRouter, amountM);
       (, amountM) = ISwapPlusv1(swapRouter).swap(mToken, amountM, tokenOut, address(this), paths[0].path);
-      return amountM;
+      
     }
-  }
-  
 
-  /**
-   * return tokenId, withdraw liquidity amount, receive token amount
-   */
+    return outs;
+  }
+
   function _withdraw(
     Operator calldata info,
     uint256 extraLp,
@@ -356,7 +325,6 @@ contract LCPoolAVv3 is Ownable {
     return amount;
   }
 
-  // mode 0: withdraw 1: deposit 2: reward
   function _distributeFee(uint256 basketId, address token, uint256 amount, uint256 mode) internal returns(uint256) {
     uint256[] memory fvar = new uint256[](4);
     fvar[0] = 0; // totalFee

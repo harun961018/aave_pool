@@ -7,22 +7,14 @@
 const hre = require("hardhat");
 
 async function main() {
-  const currentTimestampInSeconds = Math.round(Date.now() / 1000);
-  const unlockTime = currentTimestampInSeconds + 60;
+  const _feeStrate = "0xA66F49F5F5529b5D04266AD966c39564f6aCFDD2";
+  const WETH = "0xf531B8F309Be94191af87605CfBf600D71C2cFe0";
+  const swapRouter = "0xf531B8F309Be94191af87605CfBf600D71C2cFe0";
+  const aavePool = "0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951";
+  const LCPoolAVv3Ledger = "0xd0eFf073d9BE081200BDeeEcaec15b088D693B53";
+  const LCPoolAVv3 = await hre.ethers.deployContract("LCPoolAVv3", [swapRouter, _feeStrate, LCPoolAVv3Ledger, WETH, aavePool]);
 
-  const lockedAmount = hre.ethers.parseEther("0.001");
 
-  const lock = await hre.ethers.deployContract("Lock", [unlockTime], {
-    value: lockedAmount,
-  });
-
-  await lock.waitForDeployment();
-
-  console.log(
-    `Lock with ${ethers.formatEther(
-      lockedAmount
-    )}ETH and unlock timestamp ${unlockTime} deployed to ${lock.target}`
-  );
 }
 
 // We recommend this pattern to be able to use async/await everywhere
