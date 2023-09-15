@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.0 <0.9.0;
 
+import "hardhat/console.sol";
+
 import "./interfaces/IWETH.sol";
 import "./interfaces/ISwapPlusv1.sol";
 import "./interfaces/IFeeTierStrate.sol";
@@ -83,24 +85,29 @@ contract LCPoolAVv3 is Ownable {
     dpvar[1] = 0; // exLp
     dpvar[2] = 0; // rewardReserve
     dpvar[3] = 0; // iAmount
-    if (info.token != address(0)) {  // If address is not null, send this amount to contract.
-      dpvar[3] = IERC20(info.token).balanceOf(address(this));
-      IERC20(info.token).safeTransferFrom(info.account, address(this), info.amount);
-      dpvar[3] = IERC20(info.token).balanceOf(address(this)) - dpvar[3];
-    }
-    else {
-      IWETH(WETH).deposit{value: msg.value}();
-      dpvar[3] = msg.value;
-    }
+
+    // if (info.token != address(0)) {  // If address is not null, send this amount to contract.
+    //   dpvar[3] = IERC20(info.token).balanceOf(address(this));
+    //   IERC20(info.token).safeTransferFrom(info.account, address(this), info.amount);
+    //   dpvar[3] = IERC20(info.token).balanceOf(address(this)) - dpvar[3];
+    // }
+    // else {
+    //   IWETH(WETH).deposit{value: msg.value}();
+    //   dpvar[3] = msg.value;
+    // }
     
     // return extraLp, reward, reserved reward, claim extra lp, claim reward amount
     (dpvar[1], dpvar[0], dpvar[2], ,) = _reinvest(info, false);
+    // console.log(
+    //     "Transferring ",
+    //     msg.sender
+    // );
+    // dpvar[3] = _distributeFee(info.basketId, (info.token==address(0)?WETH:info.token), dpvar[3], 1);
+    // (uint16 poolId, uint256 liquidity) = _deposit(info, dpvar[3], mtoken, paths);
+    // ILCPoolAVv3Ledger(ledger).updateInfo(info.account, poolId, info.basketId, liquidity, dpvar[0], dpvar[2], dpvar[1], true);
 
-    dpvar[3] = _distributeFee(info.basketId, (info.token==address(0)?WETH:info.token), dpvar[3], 1);
-    (uint16 poolId, uint256 liquidity) = _deposit(info, dpvar[3], mtoken, paths);
-    ILCPoolAVv3Ledger(ledger).updateInfo(info.account, poolId, info.basketId, liquidity, dpvar[0], dpvar[2], dpvar[1], true);
-
-    return (poolId, liquidity);
+    // return (poolId, liquidity);
+    return (0, 0);
   }
 
   function withdraw(
@@ -203,7 +210,7 @@ contract LCPoolAVv3 is Ownable {
       rvar[1] = _increaseLiquidity(info.pair, rvar[0]);
       rvar[2] = rvar[0] - rvar[1];
       emit ReInvest(info.pair[0], info.pair[1], uint24(info.meta), poolId, rvar[0], rvar[1]);
-    }// should be checked
+    }
     return (rvar[1], rvar[0], rvar[2], rvar[3], rvar[4]);
   }
 
@@ -360,33 +367,33 @@ contract LCPoolAVv3 is Ownable {
     return fvar[2];
   }
 
-  function setManager(address account, bool access) public onlyOwner {
-    managers[account] = access;
-  }
+  // function setManager(address account, bool access) public onlyOwner {
+  //   managers[account] = access;
+  // }
 
-  function setOperator(address account, bool access) public onlyManager {
-    operators[account] = access;
-  }
+  // function setOperator(address account, bool access) public onlyManager {
+  //   operators[account] = access;
+  // }
 
-  function setFeeStrate(address _feeStrate) external onlyManager {
-    require(_feeStrate != address(0), "LC pool: Fee Strate");
-    feeStrate = _feeStrate;
-  }
+  // function setFeeStrate(address _feeStrate) external onlyManager {
+  //   require(_feeStrate != address(0), "LC pool: Fee Strate");
+  //   feeStrate = _feeStrate;
+  // }
 
-  function setSwapRouter(address _swapRouter) external onlyManager {
-    require(_swapRouter != address(0), "LC pool: Swap Router");
-    swapRouter = _swapRouter;
-  }
+  // function setSwapRouter(address _swapRouter) external onlyManager {
+  //   require(_swapRouter != address(0), "LC pool: Swap Router");
+  //   swapRouter = _swapRouter;
+  // }
 
-  function setAavePool(address _aavePool) external onlyManager {
-    require(_aavePool != address(0), "LC pool: Swap Router");
-    aavePool = _aavePool;
-  }
+  // function setAavePool(address _aavePool) external onlyManager {
+  //   require(_aavePool != address(0), "LC pool: Swap Router");
+  //   aavePool = _aavePool;
+  // }
 
-  function setReinvestInfo(bool able, uint256 edge) public onlyManager {
-    reinvestAble = able;
-    reinvestEdge = edge;
-  }
+  // function setReinvestInfo(bool able, uint256 edge) public onlyManager {
+  //   reinvestAble = able;
+  //   reinvestEdge = edge;
+  // }
 
   function _approveTokenIfNeeded(address token, address spender, uint256 amount) private {
     if (IERC20(token).allowance(address(this), spender) < amount) {

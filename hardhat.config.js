@@ -17,18 +17,23 @@ module.exports = {
     settings: {
       optimizer: {
         enabled: true,
-        runs: 200,
+        runs: 1000,
       },
     },
   },
   networks: {
-    sepolia: {
-      url: `https://sepolia.infura.io/v3/${INFURA_API_KEY}`,
-      accounts: [SEPOLIA_PRIVATE_KEY],
-    },
+    // sepolia: {
+    //   url: `https://sepolia.infura.io/v3/${INFURA_API_KEY}`,
+    //   accounts: [SEPOLIA_PRIVATE_KEY],
+    // },
+    hardhat: {
+      forking: {
+        url: `https://mainnet.infura.io/v3/${INFURA_API_KEY}`,
+      }
+    }
   },
-  etherscan: {
-    apiKey: "3TXXGES3FMQEPY77CGJK9UN9H7BBDMTFNY"
-  },
-  defaultNetwork: "sepolia",
+  // etherscan: {
+  //   apiKey: "3TXXGES3FMQEPY77CGJK9UN9H7BBDMTFNY"
+  // },
+  // defaultNetwork: "sepolia",
 };
