@@ -22,18 +22,18 @@ module.exports = {
     },
   },
   networks: {
-    // sepolia: {
-    //   url: `https://sepolia.infura.io/v3/${INFURA_API_KEY}`,
-    //   accounts: [SEPOLIA_PRIVATE_KEY],
-    // },
-    hardhat: {
-      forking: {
-        url: `https://mainnet.infura.io/v3/${INFURA_API_KEY}`,
-      }
-    }
+    sepolia: {
+      url: `https://sepolia.infura.io/v3/${INFURA_API_KEY}`,
+      accounts: [SEPOLIA_PRIVATE_KEY],
+    },
+    // hardhat: {
+    //   forking: {
+    //     url: `https://sepolia.infura.io/v3/${INFURA_API_KEY}npx hardhat node --fork `,
+    //   }
+    // }
   },
-  // etherscan: {
-  //   apiKey: "3TXXGES3FMQEPY77CGJK9UN9H7BBDMTFNY"
-  // },
-  // defaultNetwork: "sepolia",
+  etherscan: {
+    apiKey: "3TXXGES3FMQEPY77CGJK9UN9H7BBDMTFNY"
+  },
+  defaultNetwork: "sepolia",
 };

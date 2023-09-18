@@ -4,18 +4,22 @@ const {
   time,
   loadFixture,
 } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
-require('events').EventEmitter.defaultMaxListeners = 15;
+// require('events').EventEmitter.defaultMaxListeners = 15;
 describe ("LCPoolAVv3", function () {
   async function deployLCaaveAndLedger() {
-    const _feeStrate = "0x471200CE99a9608b5676660c98d31167825Af1DE";
+    const _feeStrate = "0xA66F49F5F5529b5D04266AD966c39564f6aCFDD2";
     const swapRouter = "0x530F86236F67C67dcF164729a2c3E7ff3785D1A3";
-    const aavePool = "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2";
-    const weth = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2";
+    const aavePool = "0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951";
+    const weth = "0xf531B8F309Be94191af87605CfBf600D71C2cFe0";
+    const weeth = "0xdD2FD4581271e230360230F9337D5c0430Bf44C0"
     const provider = ethers.getDefaultProvider();
-  const balance = await provider.getBalance(weth);
+    const LCPoolAVv3Ledger = "0xd0eFf073d9BE081200BDeeEcaec15b088D693B53";
     // Contracts are deployed using the first signer/account by default
     const [owner, otherAccount] = await ethers.getSigners();
-    const LCPoolAVv3Ledger = await ethers.deployContract("LCPoolAVv3Ledger", [ _feeStrate]);
+    
+    const impersonatedSigner = await ethers.getImpersonatedSigner("0xf531B8F309Be94191af87605CfBf600D71C2cFe0");
+    const balance = await provider.getBalance(weeth);
+    console.log("balance", balance);
     const LCPoolAVv3 = await ethers.deployContract("LCPoolAVv3", [swapRouter, _feeStrate, LCPoolAVv3Ledger, weth, aavePool]);
     return { LCPoolAVv3Ledger, LCPoolAVv3, owner, otherAccount, _feeStrate, };
   }
@@ -83,7 +87,7 @@ describe ("LCPoolAVv3", function () {
   // });
   describe("deposit", function () {
     it("Should deposit", async function () {
-      this.timeout(100000);
+      // this.timeout(100000);
       const {  LCPoolAVv3, otherAccount } = await loadFixture(deployLCaaveAndLedger);
       const token1 = "0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9";
       const token2 = "0xA700b4eB416Be35b2911fd5Dee80678ff64fF6C9";
@@ -97,8 +101,9 @@ describe ("LCPoolAVv3", function () {
       };
       const mtoken = token2;
       const paths = [[], []];
-      await LCPoolAVv3.connect(otherAccount).deposit(info, mtoken, paths);
-      done();
+      
+      await LCPoolAVv3.connect(otherAccount).deposit(info, mtoken);
+      // done();
     });
   });
   

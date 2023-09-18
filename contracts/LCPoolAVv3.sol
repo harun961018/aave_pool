@@ -86,28 +86,22 @@ contract LCPoolAVv3 is Ownable {
     dpvar[2] = 0; // rewardReserve
     dpvar[3] = 0; // iAmount
 
-    // if (info.token != address(0)) {  // If address is not null, send this amount to contract.
-    //   dpvar[3] = IERC20(info.token).balanceOf(address(this));
-    //   IERC20(info.token).safeTransferFrom(info.account, address(this), info.amount);
-    //   dpvar[3] = IERC20(info.token).balanceOf(address(this)) - dpvar[3];
-    // }
-    // else {
-    //   IWETH(WETH).deposit{value: msg.value}();
-    //   dpvar[3] = msg.value;
-    // }
+    if (info.token != address(0)) {  // If address is not null, send this amount to contract.
+      dpvar[3] = IERC20(info.token).balanceOf(address(this));
+      IERC20(info.token).safeTransferFrom(info.account, address(this), info.amount);
+      dpvar[3] = IERC20(info.token).balanceOf(address(this)) - dpvar[3];
+    }
+    else {
+      IWETH(WETH).deposit{value: msg.value}();
+      dpvar[3] = msg.value;
+    }
     
     // return extraLp, reward, reserved reward, claim extra lp, claim reward amount
     (dpvar[1], dpvar[0], dpvar[2], ,) = _reinvest(info, false);
-    // console.log(
-    //     "Transferring ",
-    //     msg.sender
-    // );
-    // dpvar[3] = _distributeFee(info.basketId, (info.token==address(0)?WETH:info.token), dpvar[3], 1);
-    // (uint16 poolId, uint256 liquidity) = _deposit(info, dpvar[3], mtoken, paths);
-    // ILCPoolAVv3Ledger(ledger).updateInfo(info.account, poolId, info.basketId, liquidity, dpvar[0], dpvar[2], dpvar[1], true);
-
-    // return (poolId, liquidity);
-    return (0, 0);
+    dpvar[3] = _distributeFee(info.basketId, (info.token==address(0)?WETH:info.token), dpvar[3], 1);
+    (uint16 poolId, uint256 liquidity) = _deposit(info, dpvar[3], mtoken, paths);
+    ILCPoolAVv3Ledger(ledger).updateInfo(info.account, poolId, info.basketId, liquidity, dpvar[0], dpvar[2], dpvar[1], true);
+    return (poolId, liquidity);
   }
 
   function withdraw(
@@ -205,9 +199,8 @@ contract LCPoolAVv3 is Ownable {
     rvar[0] = _distributeFee(info.basketId, info.pair[0], rvar[0], 2);
     rvar[0] = rvar[0] >= rvar[4] ? rvar[0] - rvar[4] : 0;
     rvar[2] = rvar[0]; // reserveReward need to check
-
     if (reinvestAble && poolId != 0 && rvar[0] >= reinvestEdge) {
-      rvar[1] = _increaseLiquidity(info.pair, rvar[0]);
+      rvar[1] = _increaseLiquidity(info.pair[0], rvar[0]);
       rvar[2] = rvar[0] - rvar[1];
       emit ReInvest(info.pair[0], info.pair[1], uint24(info.meta), poolId, rvar[0], rvar[1]);
     }
@@ -229,37 +222,28 @@ contract LCPoolAVv3 is Ownable {
       poolId += 1;
       ILCPoolAVv3Ledger(ledger).setPoolToId(info.pair[0], info.pair[1], uint24(info.meta), poolId); 
     }
-    amountToSupply = _increaseLiquidity(info.pair, amountToSupply);
+    amountToSupply = _increaseLiquidity(info.pair[0], amountToSupply);
     // _refundReserveToken(info.account, info.pair[0], info.pair[1], amount0-amount[0], amount1-amount[1]);
     emit Deposit(poolId, amountToSupply);
     return (poolId, amountToSupply);
   }
 
   function _increaseLiquidity(
-    address[2] memory token,
+    address token,
     uint256 amountToAdd
   ) internal returns(uint256){
-    uint256 addedaTokenAmount = IERC20(token[0]).balanceOf(address(this));
+    uint256 addedaTokenAmount = IERC20(token).balanceOf(address(this));
     if (addedaTokenAmount > amountToAdd) {
-      _approveTokenIfNeeded(token[0], aavePool, amountToAdd);
-      IPool(aavePool).supply(token[0], amountToAdd, address(this), 0);
+      _approveTokenIfNeeded(token, aavePool, amountToAdd);
+      IPool(aavePool).supply(token, amountToAdd, address(this), 0);
     } else {
-      _approveTokenIfNeeded(token[0], aavePool, addedaTokenAmount);
-      IPool(aavePool).supply(token[0], addedaTokenAmount, address(this), 0);
+      _approveTokenIfNeeded(token, aavePool, addedaTokenAmount);
+      IPool(aavePool).supply(token, addedaTokenAmount, address(this), 0);
     }
 
-    addedaTokenAmount -= IERC20(token[0]).balanceOf(address(this));
+    addedaTokenAmount -= IERC20(token).balanceOf(address(this));
 
     return addedaTokenAmount;
-  }
-
-  function _refundReserveToken(address account, address token0, address token1, uint256 amount0, uint256 amount1) internal {
-    if (amount0 > 0) {
-      IERC20(token0).safeTransfer(account, amount0);
-    }
-    if (amount1 > 0) {
-      IERC20(token1).safeTransfer(account, amount1);
-    }
   }
 
   function _withdrawSwap(
@@ -367,33 +351,33 @@ contract LCPoolAVv3 is Ownable {
     return fvar[2];
   }
 
-  // function setManager(address account, bool access) public onlyOwner {
-  //   managers[account] = access;
-  // }
+  function setManager(address account, bool access) public onlyOwner {
+    managers[account] = access;
+  }
 
-  // function setOperator(address account, bool access) public onlyManager {
-  //   operators[account] = access;
-  // }
+  function setOperator(address account, bool access) public onlyManager {
+    operators[account] = access;
+  }
 
-  // function setFeeStrate(address _feeStrate) external onlyManager {
-  //   require(_feeStrate != address(0), "LC pool: Fee Strate");
-  //   feeStrate = _feeStrate;
-  // }
+  function setFeeStrate(address _feeStrate) external onlyManager {
+    require(_feeStrate != address(0), "LC pool: Fee Strate");
+    feeStrate = _feeStrate;
+  }
 
-  // function setSwapRouter(address _swapRouter) external onlyManager {
-  //   require(_swapRouter != address(0), "LC pool: Swap Router");
-  //   swapRouter = _swapRouter;
-  // }
+  function setSwapRouter(address _swapRouter) external onlyManager {
+    require(_swapRouter != address(0), "LC pool: Swap Router");
+    swapRouter = _swapRouter;
+  }
 
-  // function setAavePool(address _aavePool) external onlyManager {
-  //   require(_aavePool != address(0), "LC pool: Swap Router");
-  //   aavePool = _aavePool;
-  // }
+  function setAavePool(address _aavePool) external onlyManager {
+    require(_aavePool != address(0), "LC pool: Swap Router");
+    aavePool = _aavePool;
+  }
 
-  // function setReinvestInfo(bool able, uint256 edge) public onlyManager {
-  //   reinvestAble = able;
-  //   reinvestEdge = edge;
-  // }
+  function setReinvestInfo(bool able, uint256 edge) public onlyManager {
+    reinvestAble = able;
+    reinvestEdge = edge;
+  }
 
   function _approveTokenIfNeeded(address token, address spender, uint256 amount) private {
     if (IERC20(token).allowance(address(this), spender) < amount) {

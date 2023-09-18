@@ -18,7 +18,7 @@ interface ILCPoolAVv3Ledger {
     uint256 reward1,
     uint256 exLp,
     bool increase
-  ) external returns(uint256, uint256);
+  ) external;
 
   function getSingleReward(address acc, uint16 tId, uint256 bId, uint256 currentReward, bool cutfee)
     external view returns(uint256, uint256);
