@@ -12,7 +12,7 @@ contract LCPoolAVv3Ledger is Ownable {
   uint256 private constant MULTIPLIER = 1_0000_0000_0000_0000;
 
   // token0 -> token1 -> fee -> poolId
-  mapping (address => mapping(address => mapping(uint24 => uint16))) public poolToId;
+  mapping (address => mapping(address => uint16)) public poolToId;
 
   struct RewardTVLRate {
     uint256 reward;
@@ -59,8 +59,8 @@ contract LCPoolAVv3Ledger is Ownable {
     managers[msg.sender] = true;
   }
 
-  function setPoolToId(address token0, address token1, uint24 fee, uint16 id) public onlyManager {
-    poolToId[token0][token1][fee] = id;
+  function setPoolToId(address token0, address token1, uint16 id) public onlyManager {
+    poolToId[token0][token1] = id;
   }
 
   function getLastRewardAmount(uint16 poolId) public view returns(uint256) {

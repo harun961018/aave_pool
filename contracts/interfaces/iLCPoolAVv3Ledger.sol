@@ -3,9 +3,9 @@ pragma solidity >=0.8.0 <0.9.0;
 
 interface ILCPoolAVv3Ledger {
   // token0 -> token1 -> fee -> poolId
-  function poolToId(address token0, address token1, uint24 fee) external view returns(uint16);
+  function poolToId(address token0, address token1) external view returns(uint16);
   function getTVLAmount(uint16 poolId) external view returns(uint256);
-  function setPoolToId(address token0, address token1, uint24 fee, uint16 id) external;
+  function setPoolToId(address token0, address token1, uint16 id) external;
   function getLastRewardAmount(uint16 poolId) external view returns(uint256);
   function getUserLiquidity(address account, uint16 poolId, uint256 basketId) external view returns(uint256);
  
