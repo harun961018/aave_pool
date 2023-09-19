@@ -4,6 +4,7 @@ pragma solidity >=0.8.0 <0.9.0;
 import "./interfaces/IFeeTierStrate.sol";
 
 import "./utils/Ownable.sol";
+import "./interfaces/IERC20.sol";
 
 contract LCPoolAVv3Ledger is Ownable {
 
@@ -69,7 +70,7 @@ contract LCPoolAVv3Ledger is Ownable {
     }
     return 0;
   }
-  function getTVLAmount(uint16 poolId) external view returns(uint256) {
+  function getTVLAmount(uint16 poolId) public view returns(uint256) {
     if (poolId != 0 && poolInfoAll[poolId].length > 0) {
       return poolInfoAll[poolId][poolInfoAll[poolId].length-1].tvl;
     }
@@ -198,24 +199,26 @@ contract LCPoolAVv3Ledger is Ownable {
     return (jvar[0], jvar[1]);
   }
 
-  // function getReward(address account, uint16[] memory poolId, uint256[] memory basketIds) public view
-  //   returns(uint256[] memory, uint256[] memory)
-  // {
-  //   uint256 bLen = basketIds.length;
-  //   uint256 len = poolId.length * bLen;
-  //   uint256[] memory extraLp = new uint256[](len);
-  //   uint256[] memory reward = new uint256[](len);
-  //   for (uint256 x = 0; x < poolId.length; x ++) {
-  //     uint256 currentReward = IMasterChefv3(v3MasterChef).pendingCake(poolId[x]);
-  //     if (poolInfoAll[poolId[x]].length > 0) {
-  //       currentReward += poolInfoAll[poolId[x]][poolInfoAll[poolId[x]].length-1].prevReward;
-  //     }
-  //     for (uint256 y = 0; y < bLen; y ++) {
-  //       (extraLp[x*bLen + y], reward[x*bLen + y]) = getSingleReward(account, poolId[x], basketIds[y], currentReward, true);
-  //     }
-  //   }
-  //   return (extraLp, reward);
-  // }
+  function getReward(address account, uint16[] memory poolId, uint256[] memory basketIds, address[] memory aToken, address lcPoolAVv3) public view
+    returns(uint256[] memory, uint256[] memory)
+  {
+    uint256 bLen = basketIds.length;
+    uint256 len = poolId.length * bLen;
+    uint256[] memory extraLp = new uint256[](len);
+    uint256[] memory reward = new uint256[](len);
+    for (uint256 x = 0; x < poolId.length; x ++) {
+      uint256 aTokenBalance = IERC20(aToken[x]).balanceOf(lcPoolAVv3);
+      uint256 depositedAmount = getTVLAmount(poolId[x]);
+      uint256 currentReward = (aTokenBalance > depositedAmount? aTokenBalance - depositedAmount : 0);
+      if (poolInfoAll[poolId[x]].length > 0) {
+        currentReward += poolInfoAll[poolId[x]][poolInfoAll[poolId[x]].length-1].prevReward;
+      }
+      for (uint256 y = 0; y < bLen; y ++) {
+        (extraLp[x*bLen + y], reward[x*bLen + y]) = getSingleReward(account, poolId[x], basketIds[y], currentReward, true);
+      }
+    }
+    return (extraLp, reward);
+  }
 
   function poolInfoLength(uint16 poolId) public view returns(uint256) {
     return poolInfoAll[poolId].length;

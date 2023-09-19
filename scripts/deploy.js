@@ -11,8 +11,8 @@ async function main() {
   const WETH =       "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9";
   const swapRouter = "0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9";
   const aavePool =   "0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951";
-  const LCPoolAVv3Ledger = "0xd0F3265C960Af77D111d399a88a242A765Ff67C7";
-  // const LCPoolAVv3Ledger = await hre.ethers.deployContract("LCPoolAVv3Ledger", [_feeStrate]);
+  // const LCPoolAVv3Ledger = "0xd0F3265C960Af77D111d399a88a242A765Ff67C7";
+  const LCPoolAVv3Ledger = await hre.ethers.deployContract("LCPoolAVv3Ledger", [_feeStrate]);
   const LCPoolAVv3 = await hre.ethers.deployContract("LCPoolAVv3", [swapRouter, _feeStrate, LCPoolAVv3Ledger, WETH, aavePool]);
 }
 

@@ -22,8 +22,8 @@ interface ILCPoolAVv3Ledger {
 
   function getSingleReward(address acc, uint16 tId, uint256 bId, uint256 currentReward, bool cutfee)
     external view returns(uint256, uint256);
-  // function getReward(address account, uint16[] memory tokenId, uint256[] memory basketIds) external view
-  //   returns(uint256[] memory, uint256[] memory);
+  function getReward(address account, uint16[] memory poolId, uint256[] memory basketIds, address[] memory aToken, address lcPoolAVv3) external view
+    returns(uint256[] memory, uint256[] memory);
   function poolInfoLength(uint16 poolId) external view returns(uint256);
   function reInvestInfoLength(uint16 poolId) external view returns(uint256);
 }

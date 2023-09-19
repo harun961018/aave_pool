@@ -15,9 +15,15 @@ module.exports = {
   solidity: {
     version: "0.8.19",
     settings: {
+      viaIR: true,
       optimizer: {
         enabled: true,
         runs: 1000,
+        details: {
+          yulDetails: {
+            optimizerSteps: "u",
+          },
+        },
       },
     },
   },
@@ -36,4 +42,6 @@ module.exports = {
     apiKey: "3TXXGES3FMQEPY77CGJK9UN9H7BBDMTFNY"
   },
   defaultNetwork: "sepolia",
+  viaIR: true,
+  optimize: true
 };

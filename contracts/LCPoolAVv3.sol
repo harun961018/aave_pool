@@ -31,9 +31,10 @@ contract LCPoolAVv3 is Ownable {
     uint256 amount;
   }
 
-  struct swapPath {
-    ISwapPlusv1.swapBlock[] path;
-  }
+  // struct swapPath {
+  //   ISwapPlusv1.swapBlock[] path;
+  // }
+
 
   mapping (address => bool) public managers;
   mapping (address => bool) public operators;
@@ -75,7 +76,7 @@ contract LCPoolAVv3 is Ownable {
   
   function deposit(
     Operator calldata info,
-    swapPath calldata paths
+    ISwapPlusv1.swapBlock[] calldata paths
   ) public payable returns(uint256, uint256) {
     require(msg.sender == info.account || operators[msg.sender], "LC pool: no access");
     uint256[] memory dpvar = new uint256[](4);
@@ -105,7 +106,7 @@ contract LCPoolAVv3 is Ownable {
   function withdraw(
     address receiver,
     Operator calldata info,
-    swapPath calldata paths
+    ISwapPlusv1.swapBlock[] calldata paths
   ) public returns(uint256) {
     require(receiver == info.account || operators[msg.sender], "LC pool: no access");
     uint256[] memory wvar = new uint256[](9);
@@ -150,18 +151,18 @@ contract LCPoolAVv3 is Ownable {
     address tokenIn,
     uint256 amountIn,
     address[2] memory tokens,
-    swapPath calldata paths
+    ISwapPlusv1.swapBlock[] calldata paths
   ) internal returns(uint256) {
     uint256 outs;
     outs = amountIn;
-    if (tokenIn == address(0)) tokenIn = WETH;//should be checked
+    if (tokenIn == address(0)) tokenIn = WETH;
     uint256 amountM = amountIn;
     if (tokenIn == tokens[0]) {
       return outs;
     }
-    if (paths.path.length > 0) {
+    if (paths.length > 0) {
       _approveTokenIfNeeded(tokenIn, swapRouter, amountM);
-      (, amountM) = ISwapPlusv1(swapRouter).swap(tokenIn, amountM, tokens[0], address(this), paths.path);
+      (, amountM) = ISwapPlusv1(swapRouter).swap(tokenIn, amountM, tokens[0], address(this), paths);
     }
     outs = amountM;
     return outs;
@@ -203,7 +204,7 @@ contract LCPoolAVv3 is Ownable {
   function _deposit(
     Operator calldata info,
     uint256 iAmount,
-    swapPath calldata paths
+    ISwapPlusv1.swapBlock[] calldata paths
   ) internal returns(uint16, uint256) {
     uint256 amountToSupply = _depositSwap(info.token, iAmount, info.pair, paths);
     uint16 poolId = ILCPoolAVv3Ledger(ledger).poolToId(info.pair[0], info.pair[1]); // poolId
@@ -242,17 +243,18 @@ contract LCPoolAVv3 is Ownable {
     address tokenOut,
     address[2] memory tokens,
     uint256 amount,
-    swapPath memory paths
+    ISwapPlusv1.swapBlock[] memory paths
   ) internal returns(uint256) {
     uint256 outs;
     uint256 amountM = amount;
     outs = amount;
+    if (tokenOut == address(0)) tokenOut = WETH;
     if (tokenOut == tokens[0]) {
       return outs;
     }
-    if (paths.path.length > 0) {
+    if (paths.length > 0) {
       _approveTokenIfNeeded(tokens[0], swapRouter, amount);
-      (, amountM) = ISwapPlusv1(swapRouter).swap(tokens[0], amount, tokenOut, address(this), paths.path);
+      (, amountM) = ISwapPlusv1(swapRouter).swap(tokens[0], amount, tokenOut, address(this), paths);
     }
 
     return outs;
@@ -261,7 +263,7 @@ contract LCPoolAVv3 is Ownable {
   function _withdraw(
     Operator calldata info,
     uint256 extraLp,
-    swapPath memory paths
+    ISwapPlusv1.swapBlock[] memory paths
   ) internal returns(uint256, uint256, uint256) {
     uint16 poolId = ILCPoolAVv3Ledger(ledger).poolToId(info.pair[0], info.pair[1]);
     if (poolId == 0) {
